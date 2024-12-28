@@ -28,8 +28,7 @@
   "module": "dist/esm/index.js",
   "types": "dist/types/index.d.ts",
   "scripts": {
-    "clean": "rimraf dist",
-    "build": "pnpm clean && tsx esbuild.ts && tsc"
+    "build": "rimraf dist && tsx esbuild.ts && tsc"
   },
   "peerDependencies": {
     "firebase": "^11.0.0",

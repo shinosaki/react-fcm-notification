@@ -85,6 +85,17 @@ export const loadMessaging = (): Messaging|null => {
 
   return messaging || null
 }
+
+interface UseFirebase {
+  app: FirebaseApp | null
+  messaging: Messaging | null
+}
+
+export const useFirebase = (): UseFirebase => {
+  const app = useMemo(() => loadApp(), [])
+  const messaging = useMemo(() => loadMessaging(), [])
+  return { app, messaging }
+}
 ```
 
 ---
@@ -98,7 +109,7 @@ import React from "react";
 import { Notification } from "react-fcm-notification";
 
 const App: React.FC = () => {
-  const messaging = loadMessaging()
+  const { messaging } = useFirebase()
 
   const handleRequest = async ({ token, isTokenActive }: OnRequestProps) => {
     console.log("Token requested:", token, "Active:", isTokenActive);

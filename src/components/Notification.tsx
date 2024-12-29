@@ -1,5 +1,5 @@
 import { Messaging } from "firebase/messaging"
-import { useFcm, useNotification } from "../hooks"
+import { useFcm, UseFcmProps, useNotification } from "../hooks"
 import { useCallback } from "react"
 
 export interface NotificationChildrenProps {
@@ -8,11 +8,7 @@ export interface NotificationChildrenProps {
   toggle: () => Promise<any>
 }
 
-export interface NotificationProps {
-  messaging: Messaging
-  vapidKey: string
-  postRequest?: () => any
-  postRemove?: () => any
+export interface NotificationProps extends UseFcmProps {
   children: (props: NotificationChildrenProps) => React.ReactNode
 }
 

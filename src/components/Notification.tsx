@@ -1,53 +1,56 @@
-import { useEffect } from "react"
 import { Messaging } from "firebase/messaging"
-import { OnRemoveProps, OnRequestProps, useFcmToken } from "../hooks/useFcm"
-import { useNotification } from "../hooks/useNotification"
+import { useFcm, useNotification } from "../hooks"
+import { useCallback } from "react"
 
-interface NotificationProps {
-    messaging: Messaging,
-    vapidKey: string,
-    onRequest?: (props: OnRequestProps) => Promise<any>
-    onRemove?: (props: OnRemoveProps) => Promise<any>
-    children: (props: NotificationChildrenProps) => React.ReactNode|Promise<React.ReactNode>,
+export interface NotificationChildrenProps {
+  loading: boolean
+  isTokenActive: boolean
+  toggle: () => Promise<any>
 }
 
-interface NotificationChildrenProps {
-    isTokenActive: boolean
-    toggle: () => Promise<void>
+export interface NotificationProps {
+  messaging: Messaging
+  vapidKey: string
+  postRequest?: () => any
+  postRemove?: () => any
+  children: (props: NotificationChildrenProps) => React.ReactNode
 }
 
 export const Notification: React.FC<NotificationProps> = ({
-    messaging,
-    vapidKey,
-    onRequest,
-    onRemove,
-    children,
+  messaging,
+  vapidKey,
+  postRequest,
+  postRemove,
+  children,
 }) => {
-    const [isTokenActive, requestToken, removeToken] = useFcmToken({
-        messaging,
-        vapidKey,
-        onRequest,
-        onRemove,
-    })
-    const [permission, _, requestPermission] = useNotification()
+  const {
+    loading: loadingFcm,
+    isTokenActive,
+    requestToken,
+    removeToken,
+  } = useFcm({ messaging, vapidKey, postRequest, postRemove })
+  const {
+    loading: loadingNotification,
+    permission,
+    requestPermission,
+  } = useNotification()
 
-    useEffect(() => {
-        if (permission === 'granted' && isTokenActive) {
-            requestToken()
-        }
-    }, [permission, isTokenActive, requestToken])
+  const loading = loadingFcm || loadingNotification
 
-    const toggle = async () => {
-        if (permission !== 'granted') {
-            await requestPermission()
-        }
-
-        if (isTokenActive) {
-            await removeToken()
-        } else {
-            await requestToken()
-        }
+  const toggle = useCallback(async () => {
+    if (permission === 'granted') {
+      if (isTokenActive) {
+        await removeToken()
+      } else {
+        await requestToken()
+      }
+    } else {
+      const permission = await requestPermission()
+      if (permission === 'granted') {
+        await requestToken()
+      }
     }
+  }, [permission, isTokenActive, requestPermission, requestToken, removeToken])
 
-    return children({ isTokenActive, toggle })
+  return children({ loading, isTokenActive, toggle })
 }

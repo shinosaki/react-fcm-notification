@@ -111,14 +111,6 @@ import { Notification } from "react-fcm-notification";
 const App: React.FC = () => {
   const { messaging } = useFirebase()
 
-  const handleRequest = async ({ token, isTokenActive }: OnRequestProps) => {
-    console.log("Token requested:", token, "Active:", isTokenActive);
-  };
-
-  const handleRemove = async ({ token, success, isTokenActive }: OnRemoveProps) => {
-    console.log("Token removed:", token, "Success:", success, "Active:", isTokenActive);
-  };
-
   if (!messaging) {
     return <p>Your browser does not support notifications.</p>;
   }
@@ -127,12 +119,12 @@ const App: React.FC = () => {
     <Notification
       messaging={messaging}
       vapidKey="YOUR_PUBLIC_VAPID_KEY"
-      onRequest={handleRequest}
-      onRemove={handleRemove}
+      postRequest={(token) => /* api.registerDevice(token) */}
+      postRemove={(token) => /* api.unregisterDevice(token) */}
     >
-      {({ isTokenActive, toggle }) => (
+      {({ loading, isTokenActive, toggle }) => (
         <div>
-          <p>Notifications are currently {isTokenActive ? "enabled" : "disabled"}.</p>
+          <p>Notifications are currently {loading ? "loading..." : (isTokenActive ? "enabled" : "disabled")}.</p>
           <button onClick={toggle}>
             {isTokenActive ? "Disable Notifications" : "Enable Notifications"}
           </button>
@@ -151,34 +143,35 @@ export default App;
 
 ### `<Notification />`
 
-| Property     | Type                                           | Required | Description                                                                 |
-| ------------ | ---------------------------------------------- | -------- | --------------------------------------------------------------------------- |
-| `messaging`  | `Messaging`                                    | Required | The Firebase `Messaging` instance.                                          |
-| `vapidKey`   | `string`                                       | Required | The VAPID key required to obtain an FCM token.                              |
-| `onRequest`  | `(props: OnRequestProps) => Promise<any>`      | Optional | Callback triggered when a token is retrieved.                               |
-| `onRemove`   | `(props: OnRemoveProps) => Promise<any>`       | Optional | Callback triggered when a token is removed.                                 |
-| `children`   | `({ isTokenActive, toggle }) => React.ReactNode` | Required | A render function receiving the token state and a toggle function.          |
+| Property      | Type                                                      | Required | Description                                                        |
+| ------------- | --------------------------------------------------------- | -------- | ------------------------------------------------------------------ |
+| `messaging`   | `Messaging`                                               | Required | The Firebase `Messaging` instance.                                 |
+| `vapidKey`    | `string`                                                  | Required | The VAPID key required to obtain an FCM token.                     |
+| `postRequest` | `(token: string) => any`                                  | Optional | Callback triggered when a token is retrieved.                      |
+| `postRemove`  | `(token: string) => any`                                  | Optional | Callback triggered when a token is removed.                        |
+| `children`    | `({ loading, isTokenActive, toggle }) => React.ReactNode` | Required | A render function receiving the token state and a toggle function. |
 
 ---
 
-### `useFcmToken`
+### `useFcm`
 
 A custom hook for managing FCM tokens.
 
 ```typescript
-const [isTokenActive, requestToken, removeToken] = useFcmToken({
+const { loading, isTokenActive, requestToken, removeToken } = useFcm({
   messaging,
   vapidKey,
-  onRequest,
-  onRemove,
+  postRequest,
+  postRemove,
 });
 ```
 
-| Return Value   | Type                   | Description                       |
-| -------------- | ---------------------- | --------------------------------- |
-| `isTokenActive`| `boolean`             | Indicates if the token is active. |
-| `requestToken` | `() => Promise<void>` | Function to request a token.      |
-| `removeToken`  | `() => Promise<void>` | Function to remove a token.       |
+| Return Value    | Type        | Description                                               |
+| --------------- | ----------- | --------------------------------------------------------- |
+| `loading`       | `boolean`   | Indicates whether token request is currently in progress. |
+| `isTokenActive` | `boolean`   | Indicates if the token is active.                         |
+| `requestToken`  | `() => any` | Function to request a token.                              |
+| `removeToken`   | `() => any` | Function to remove a token.                               |
 
 ---
 
@@ -187,14 +180,14 @@ const [isTokenActive, requestToken, removeToken] = useFcmToken({
 A custom hook for managing notification permissions.
 
 ```typescript
-const [permission, setPermission, requestPermission] = useNotification();
+const { loading, permission, requestPermission } = useNotification();
 ```
 
-| Return Value       | Type                                | Description                         |
-| ------------------ | ----------------------------------- | ----------------------------------- |
-| `permission`       | `NotificationPermission`           | Current notification permission.    |
-| `setPermission`    | `Dispatch<SetStateAction<NotificationPermission>>` | Function to set the permission. |
-| `requestPermission`| `() => Promise<void>`              | Function to request notification permissions. |
+| Return Value        | Type                                    | Description                                                                                        |
+| ------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `loading`           | `boolean`                               | Indicates whether a notification permission request is currently in progress.                      |
+| `permission`        | `NotificationPermission`                | Represents the current permission status for notifications (e.g., "granted", "denied", "default"). |
+| `requestPermission` | `() => Promise<NotificationPermission>` | Function to request notification permission from the user.                                         |
 
 ---
 

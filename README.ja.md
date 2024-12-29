@@ -86,6 +86,17 @@ export const loadMessaging = (): Messaging|null => {
 
   return messaging || null
 }
+
+interface UseFirebase {
+  app: FirebaseApp | null
+  messaging: Messaging | null
+}
+
+export const useFirebase = (): UseFirebase => {
+  const app = useMemo(() => loadApp(), [])
+  const messaging = useMemo(() => loadMessaging(), [])
+  return { app, messaging }
+}
 ```
 
 ---
@@ -99,33 +110,24 @@ import React from "react";
 import { Notification } from "react-fcm-notification";
 
 const App: React.FC = () => {
-  const messaging = loadMessaging()
+  const { messaging } = useFirebase()
 
-  const handleRequest = async ({ token, isTokenActive }: OnRequestProps) => {
-    console.log("Token requested:", token, "Active:", isTokenActive);
-  };
-
-  const handleRemove = async ({ token, success, isTokenActive }: OnRemoveProps) => {
-    console.log("Token removed:", token, "Success:", success, "Active:", isTokenActive);
-  };
-
-  if (messaging) {
-    // Service Workerが利用できない場合など
-    return <p>通知に対応していません</p>
+  if (!messaging) {
+    return <p>Your browser does not support notifications.</p>;
   }
 
   return (
     <Notification
       messaging={messaging}
       vapidKey="YOUR_PUBLIC_VAPID_KEY"
-      onRequest={handleRequest}
-      onRemove={handleRemove}
+      postRequest={(token) => /* api.registerDevice(token) */}
+      postRemove={(token) => /* api.unregisterDevice(token) */}
     >
-      {({ isTokenActive, toggle }) => (
+      {({ loading, isTokenActive, toggle }) => (
         <div>
-          <p>通知が{isTokenActive ? "有効" : "無効"}です</p>
+          <p>Notifications are currently {loading ? "loading..." : (isTokenActive ? "enabled" : "disabled")}.</p>
           <button onClick={toggle}>
-            {isTokenActive ? "通知を無効化する" : "通知を有効化する"}
+            {isTokenActive ? "Disable Notifications" : "Enable Notifications"}
           </button>
         </div>
       )}
@@ -142,26 +144,26 @@ export default App;
 
 ### `<Notification />`
 
-| プロパティ        | 型                         | 必須  | 説明                                                                                           |
-| ----------------- | -------------------------- | ----- | ---------------------------------------------------------------------------------------------- |
-| `messaging`       | `Messaging`                | 必須  | Firebaseの`Messaging`インスタンス。                                                            |
-| `vapidKey`        | `string`                   | 必須  | FCMのトークンを取得する際に必要なVAPIDキー。                                                   |
-| `onRequest`       | `(props: OnRequestProps) => Promise<any>` | 任意  | トークン取得時のコールバック。                                                                 |
-| `onRemove`        | `(props: OnRemoveProps) => Promise<any>`  | 任意  | トークン削除時のコールバック。                                                                 |
-| `children`        | `({ isTokenActive, toggle }) => React.ReactNode` | 必須  | 子コンポーネントの関数。トークンの状態と切り替え関数を受け取ります。                           |
+| プロパティ     | 型                                                        | 必須 | 説明                                                                |
+| ------------- | --------------------------------------------------------- | ---- | ------------------------------------------------------------------ |
+| `messaging`   | `Messaging`                                               | 必須 | Firebaseの`Messaging`インスタンス。 |
+| `vapidKey`    | `string`                                                  | 必須 | FCMのトークンを取得する際に必要なVAPIDキー。 |
+| `postRequest` | `(token: string) => any`                                  | 任意 | トークン取得時のコールバック。 |
+| `postRemove`  | `(token: string) => any`                                  | 任意 | トークン削除時のコールバック。 |
+| `children`    | `({ loading, isTokenActive, toggle }) => React.ReactNode` | 必須 | 子コンポーネントの関数。トークンの状態と切り替え関数を受け取ります。 |
 
 ---
 
-### `useFcmToken`
+### `useFcm`
 
 FCMトークンを管理するためのカスタムフック。
 
 ```typescript
-const [isTokenActive, requestToken, removeToken] = useFcmToken({
-    messaging,
-    vapidKey,
-    onRequest,
-    onRemove,
+const { loading, isTokenActive, requestToken, removeToken } = useFcm({
+  messaging,
+  vapidKey,
+  postRequest,
+  postRemove,
 });
 ```
 
@@ -170,6 +172,12 @@ const [isTokenActive, requestToken, removeToken] = useFcmToken({
 | `isTokenActive`     | `boolean`        | トークンが有効かどうか。 |
 | `requestToken`      | `() => Promise<void>` | トークンをリクエストする関数。 |
 | `removeToken`       | `() => Promise<void>` | トークンを削除する関数。 |
+| 戻り値           | 型          | 説明 |
+| --------------- | ----------- | ------------------------------------ |
+| `loading`       | `boolean`   | トークン取得・削除処理が進行中かどうか。 |
+| `isTokenActive` | `boolean`   | トークンが有効かどうか。 |
+| `requestToken`  | `() => any` | トークンをリクエストする関数。 |
+| `removeToken`   | `() => any` | トークンを削除する関数。 |
 
 ---
 
@@ -178,14 +186,14 @@ const [isTokenActive, requestToken, removeToken] = useFcmToken({
 通知権限を管理するためのカスタムフック。
 
 ```typescript
-const [permission, setPermission, requestPermission] = useNotification();
+const { loading, permission, requestPermission } = useNotification();
 ```
 
-| 戻り値              | 型                              | 説明                      |
-| ------------------- | ------------------------------- | ------------------------- |
-| `permission`        | `NotificationPermission`        | 現在の通知権限。          |
-| `setPermission`     | `Dispatch<SetStateAction<NotificationPermission>>` | 権限を直接設定する関数。 |
-| `requestPermission` | `() => Promise<void>`           | 通知権限をリクエストする関数。 |
+| 戻り値              | 型                        | 説明                          |
+| ------------------- | ------------------------ | ----------------------------- |
+| `loading`           | `boolean`                | 通知権限の取得が進行中かどうか。 |
+| `permission`        | `NotificationPermission` | 現在の通知権限。 |
+| `requestPermission` | `() => Promise<void>`    | 通知権限をリクエストする関数。 |
 
 ---
 

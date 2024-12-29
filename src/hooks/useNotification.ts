@@ -17,7 +17,7 @@ export const useNotification = () => {
     }
   }, [])
 
-  const request = useCallback(async () => {
+  const requestPermission = useCallback(async () => {
     setLoading(true)
 
     try {
@@ -31,5 +31,5 @@ export const useNotification = () => {
     }
   }, [])
 
-  return { loading, permission, request }
+  return { loading, permission, requestPermission }
 }

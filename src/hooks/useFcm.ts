@@ -1,63 +1,62 @@
-import { useState } from 'react'
-import { deleteToken, getToken, Messaging } from 'firebase/messaging'
+import { deleteToken, getToken, Messaging } from "firebase/messaging"
+import { useCallback, useState } from "react"
 
-export interface OnRequestProps {
-    token: string
-    isTokenActive: boolean
+const LS = {
+  getTokenState: (key = 'token_state', initValue = 'false') => {
+    const value = localStorage.getItem(key) ?? initValue
+    return Boolean(JSON.parse(value))
+  },
+  setTokenState: (state: boolean, key = 'token_state') => {
+    localStorage.setItem(key, JSON.stringify(state))
+    return state
+  },
 }
 
-export interface OnRemoveProps {
-    token: string|null
-    success: boolean
-    isTokenActive: boolean
+export interface UseFcmProps {
+  messaging: Messaging
+  vapidKey: string
+  postRequest?: (token: string) => any
+  postRemove?: (token: string) => any
 }
 
-export interface UseFcmTokenProps {
-    messaging: Messaging
-    vapidKey: string
-    lsKey?: string
-    onRequest?: (props: OnRequestProps) => Promise<any>
-    onRemove?: (props: OnRemoveProps) => Promise<any>
-}
+export const useFcm = ({ messaging, vapidKey, postRequest, postRemove }: UseFcmProps) => {
+  const [loading, setLoading] = useState(false)
+  const [isTokenActive, setIsTokenActive] = useState(LS.getTokenState())
 
-export type UseFcmToken = [
-    boolean,
-    () => Promise<void>,
-    () => Promise<void>,
-]
+  const requestToken = useCallback(async () => {
+    setLoading(true)
 
-export const useFcmToken = ({
-    messaging,
-    vapidKey,
-    lsKey = 'isTokenActive',
-    onRequest,
-    onRemove,
-}: UseFcmTokenProps): UseFcmToken => {
-    const [token, setToken] = useState<string|null>(null)
-    const [isTokenActive, setIsTokenActive] = useState<boolean>(
-        () => !!JSON.parse(localStorage.getItem(lsKey) ?? 'false')
-    )
+    try {
+      const token = await getToken(messaging, { vapidKey })
 
-    const requestToken = async () => {
-        const token = await getToken(messaging, { vapidKey })
+      setIsTokenActive(!!token)
+      LS.setTokenState(!!token)
 
-        setToken(token)
-        setIsTokenActive(!!token)
-
-        localStorage.setItem(lsKey, JSON.stringify(!!token))
-
-        onRequest?.({ token, isTokenActive })
+      if (token) {
+        await postRequest?.(token)
+      }
+    } finally {
+      setLoading(false)
     }
+  }, [messaging, vapidKey])
 
-    const removeToken = async () => {
-        const success = await deleteToken(messaging)
-        console.log('removetoken', success)
+  const removeToken = useCallback(async () => {
+    setLoading(true)
 
-        setIsTokenActive(!success)
-        localStorage.setItem(lsKey, JSON.stringify(!success))
+    try {
+      const token = await getToken(messaging, { vapidKey })
+      const isDeleteSuccess = await deleteToken(messaging)
 
-        onRemove?.({ token, success, isTokenActive })
+      setIsTokenActive(!isDeleteSuccess)
+      LS.setTokenState(!isDeleteSuccess)
+
+      if (isDeleteSuccess && token) {
+        await postRemove?.(token)
+      }
+    } finally {
+      setLoading(false)
     }
+  }, [messaging, vapidKey])
 
-    return [isTokenActive, requestToken, removeToken]
+  return { loading, isTokenActive, requestToken, removeToken }
 }
